@@ -9,11 +9,19 @@
       "ios": {
         "simulator": false,
         "distribution": "internal"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://otoku-backend-env.eba-p2xve6pp.ap-northeast-1.elasticbeanstalk.com",
+        "EXPO_PUBLIC_NEARBY_STORES_RADIUS_METERS": "5000"
       }
     },
     "production": {
       "autoIncrement": true,
-      "distribution": "store"
+      "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://otoku-backend-env.eba-p2xve6pp.ap-northeast-1.elasticbeanstalk.com",
+        "EXPO_PUBLIC_NEARBY_STORES_RADIUS_METERS": "5000"
+      }
     }
   }
 }
