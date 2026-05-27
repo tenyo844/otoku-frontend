@@ -1,15 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Store } from '../types';
+import MealSuggestionModal from './MealSuggestionModal';
 
 interface StoreCardProps {
   store: Store;
@@ -18,12 +18,13 @@ interface StoreCardProps {
 }
 
 export default function StoreCard({ store, onClose, expanded = false }: StoreCardProps) {
+  const [mealModalVisible, setMealModalVisible] = useState(false);
   const distanceText =
     store.distance < 1000
       ? `${Math.round(store.distance)}m`
       : `${(store.distance / 1000).toFixed(1)}km`;
 
-  const openFlyer = (url: string) => {
+  const openUrl = (url: string) => {
     Linking.openURL(url);
   };
 
@@ -57,10 +58,10 @@ export default function StoreCard({ store, onClose, expanded = false }: StoreCar
           </View>
         </View>
 
-        {/* Flyer Count Badge */}
-        <View style={styles.flyerBadge}>
-          <Text style={styles.flyerCount}>{store.flyerCount}</Text>
-          <Text style={styles.flyerLabel}>チラシ</Text>
+        {/* Deal Count Badge */}
+        <View style={styles.dealBadge}>
+          <Text style={styles.dealCount}>{store.dealCount}</Text>
+          <Text style={styles.dealLabel}>特売</Text>
         </View>
 
         {onClose && (
@@ -70,54 +71,67 @@ export default function StoreCard({ store, onClose, expanded = false }: StoreCar
         )}
       </View>
 
-      {/* Flyers */}
-      {store.flyers.length > 0 ? (
+      {/* Deals */}
+      {store.deals.length > 0 ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.flyerScroll}
-          contentContainerStyle={styles.flyerScrollContent}
+          style={styles.dealScroll}
+          contentContainerStyle={styles.dealScrollContent}
         >
-          {store.flyers.map((flyer) => (
+          {store.deals.map((deal, index) => (
             <TouchableOpacity
-              key={flyer.id}
-              style={styles.flyerItem}
-              onPress={() => openFlyer(flyer.pageUrl)}
+              key={index}
+              style={styles.dealItem}
+              onPress={() => openUrl(deal.url)}
               activeOpacity={0.8}
             >
-              <Image
-                source={{ uri: flyer.thumbUrl }}
-                style={styles.flyerThumb}
-                resizeMode="cover"
-              />
-              {flyer.validUntil && (
-                <View style={styles.validBadge}>
-                  <Text style={styles.validText} numberOfLines={1}>
-                    {flyer.validUntil}
-                  </Text>
-                </View>
-              )}
+              <Text style={styles.dealTitle} numberOfLines={1}>
+                {deal.title ?? store.name}
+              </Text>
+              <Text style={styles.dealSummary} numberOfLines={4}>
+                {deal.summary}
+              </Text>
+              <View style={styles.dealLink}>
+                <Ionicons name="open-outline" size={11} color="#FF6B35" />
+                <Text style={styles.dealLinkText}>詳細を見る</Text>
+              </View>
             </TouchableOpacity>
           ))}
         </ScrollView>
       ) : (
-        <View style={styles.noFlyer}>
-          <Text style={styles.noFlyerText}>チラシなし</Text>
+        <View style={styles.noDeal}>
+          <Text style={styles.noDealText}>特売情報なし</Text>
         </View>
       )}
 
       {!expanded && (
-        <TouchableOpacity
-          style={styles.viewMoreButton}
-          onPress={() => openFlyer(
-            store.flyers[0]?.pageUrl ??
-            `https://www.shufoo.net/pntweb/shopSearchList/?keyword=${encodeURIComponent(store.name)}`
+        <View style={styles.actionRow}>
+          {store.website && (
+            <TouchableOpacity
+              style={styles.viewMoreButton}
+              onPress={() => openUrl(store.website!)}
+            >
+              <Text style={styles.viewMoreText}>店舗サイトを見る</Text>
+              <Ionicons name="open-outline" size={14} color="#FF6B35" />
+            </TouchableOpacity>
           )}
-        >
-          <Text style={styles.viewMoreText}>Shufooで見る</Text>
-          <Ionicons name="open-outline" size={14} color="#FF6B35" />
-        </TouchableOpacity>
+          {store.deals.length > 0 && (
+            <TouchableOpacity
+              style={styles.mealButton}
+              onPress={() => setMealModalVisible(true)}
+            >
+              <Text style={styles.mealButtonText}>🍽️ 献立を提案</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
+
+      <MealSuggestionModal
+        store={store}
+        visible={mealModalVisible}
+        onClose={() => setMealModalVisible(false)}
+      />
     </View>
   );
 }
@@ -174,7 +188,7 @@ const styles = StyleSheet.create({
   },
   storeName: {
     fontSize: 16,
-    fontFamily: 'NotoSansJP-Bold',
+    fontWeight: 'bold',
     color: '#1A1A1A',
     marginBottom: 3,
   },
@@ -185,7 +199,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    fontFamily: 'NotoSansJP-Regular',
+    fontWeight: 'normal',
     color: '#999',
   },
   dot: {
@@ -196,9 +210,9 @@ const styles = StyleSheet.create({
   },
   openStatus: {
     fontSize: 12,
-    fontFamily: 'NotoSansJP-Medium',
+    fontWeight: '500',
   },
-  flyerBadge: {
+  dealBadge: {
     flexDirection: 'row',
     alignItems: 'baseline',
     backgroundColor: '#FFF5F0',
@@ -207,71 +221,97 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     gap: 2,
   },
-  flyerCount: {
+  dealCount: {
     fontSize: 20,
-    fontFamily: 'NotoSansJP-Bold',
+    fontWeight: 'bold',
     color: '#FF6B35',
   },
-  flyerLabel: {
+  dealLabel: {
     fontSize: 11,
-    fontFamily: 'NotoSansJP-Regular',
+    fontWeight: 'normal',
     color: '#FF6B35',
   },
   closeButton: {
     padding: 4,
   },
-  flyerScroll: {
+  dealScroll: {
     marginHorizontal: -4,
   },
-  flyerScrollContent: {
+  dealScrollContent: {
     paddingHorizontal: 4,
     gap: 8,
   },
-  flyerItem: {
+  dealItem: {
+    width: 200,
+    backgroundColor: '#FFF5F0',
     borderRadius: 10,
-    overflow: 'hidden',
-    position: 'relative',
+    padding: 10,
+    gap: 4,
   },
-  flyerThumb: {
-    width: 120,
-    height: 90,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 10,
+  dealTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
   },
-  validBadge: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    right: 4,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+  dealSummary: {
+    fontSize: 11,
+    fontWeight: 'normal',
+    color: '#555',
+    lineHeight: 16,
   },
-  validText: {
-    fontSize: 9,
-    color: '#FFF',
-    textAlign: 'center',
+  dealLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: 2,
   },
-  noFlyer: {
+  dealLinkText: {
+    fontSize: 11,
+    fontWeight: 'normal',
+    color: '#FF6B35',
+  },
+  noDeal: {
     paddingVertical: 12,
     alignItems: 'center',
   },
-  noFlyerText: {
+  noDealText: {
     fontSize: 12,
-    fontFamily: 'NotoSansJP-Regular',
+    fontWeight: 'normal',
     color: '#CCC',
   },
-  viewMoreButton: {
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 10,
+    gap: 8,
+  },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FF6B35',
   },
   viewMoreText: {
     fontSize: 13,
-    fontFamily: 'NotoSansJP-Medium',
+    fontWeight: '500',
     color: '#FF6B35',
+  },
+  mealButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#FF6B35',
+  },
+  mealButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#FFF',
   },
 });

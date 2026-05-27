@@ -14,9 +14,18 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.yourcompany.dealfinder",
+      "bundleIdentifier": "com.yosuketengan.otoku",
+      "buildNumber": "2",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "周辺のお買い得情報を表示するために現在地を使用します。"
+        "NSLocationWhenInUseUsageDescription": "周辺のお買い得情報を表示するために現在地を使用します。",
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "otoku-backend-env.eba-p2xve6pp.ap-northeast-1.elasticbeanstalk.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": true
+            }
+          }
+        }
       }
     },
     "android": {
@@ -24,7 +33,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FAFAF7"
       },
-      "package": "com.yourcompany.dealfinder",
+      "package": "com.yosuketengan.otoku",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",

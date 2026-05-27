@@ -3,12 +3,10 @@ export interface Coordinates {
   longitude: number;
 }
 
-export interface Flyer {
-  id: string;
+export interface DealContent {
+  url: string;
   title?: string;
-  thumbUrl: string;
-  pageUrl: string;
-  validUntil?: string; // e.g. "5/13〜5/19"
+  summary: string; // 店舗Webサイトから取得した特売テキスト
 }
 
 export interface Store {
@@ -20,8 +18,9 @@ export interface Store {
   longitude: number;
   distance: number; // meters
   isOpen?: boolean;
-  flyerCount: number;
-  flyers: Flyer[];
+  dealCount: number;
+  deals: DealContent[];
+  website?: string;
   address?: string;
   phone?: string;
 }

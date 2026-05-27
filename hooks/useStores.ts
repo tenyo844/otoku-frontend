@@ -3,6 +3,7 @@ import * as Location from 'expo-location';
 import { Store, Coordinates } from '../types';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+const NEARBY_RADIUS = Number(process.env.EXPO_PUBLIC_NEARBY_STORES_RADIUS_METERS ?? 5000);
 
 export function useStores() {
   const [stores, setStores] = useState<Store[]>([]);
@@ -13,11 +14,26 @@ export function useStores() {
   const fetchStores = useCallback(async (coords: Coordinates) => {
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/stores?lat=${coords.latitude}&lng=${coords.longitude}&radius=2000`
+        `${API_BASE_URL}/api/stores?lat=${coords.latitude}&lng=${coords.longitude}&radius=${NEARBY_RADIUS}`
       );
       if (!res.ok) throw new Error('店舗情報の取得に失敗しました');
       const data = await res.json();
-      setStores(data.stores);
+      const mapped: Store[] = data.stores.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        category: s.category,
+        categoryEmoji: s.category_emoji,
+        latitude: s.latitude,
+        longitude: s.longitude,
+        distance: s.distance,
+        isOpen: s.is_open,
+        dealCount: s.deal_count,
+        deals: s.deals,
+        website: s.website,
+        address: s.address,
+        phone: s.phone,
+      }));
+      setStores(mapped);
     } catch (err) {
       setError(err instanceof Error ? err.message : '不明なエラーが発生しました');
     }
@@ -29,12 +45,29 @@ export function useStores() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setError('位置情報の許可が必要です。設定から許可してください。');
+        setError('位置情報の許可が必要です。設定アプリから「常に」または「使用中のみ許可」に変更してください。');
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
+
+      // キャッシュ済み位置を先に試みる（即時返る）
+      let loc: Location.LocationObject | null =
+        await Location.getLastKnownPositionAsync({ maxAge: 300_000 }).catch(() => null);
+
+      if (!loc) {
+        // キャッシュがない場合のみ現在地取得を待つ（低精度で高速）
+        try {
+          loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Low,
+          });
+        } catch (e) {
+          console.error('[Location] getCurrentPositionAsync error:', e);
+          setError(
+            '位置情報を取得できませんでした。\n設定 → プライバシーと セキュリティ → 位置情報サービス → Expo Go を「使用中のみ許可」にしてください。'
+          );
+          return;
+        }
+      }
+
       const coords: Coordinates = {
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
@@ -42,7 +75,7 @@ export function useStores() {
       setLocation(coords);
       await fetchStores(coords);
     } catch (err) {
-      setError('位置情報の取得に失敗しました');
+      setError('位置情報の取得に失敗しました。再試行してください。');
     } finally {
       setLoading(false);
     }

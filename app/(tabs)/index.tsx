@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -15,19 +15,48 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useStores } from '../../hooks/useStores';
 import StoreCard from '../../components/StoreCard';
+import MealSuggestionModal from '../../components/MealSuggestionModal';
+import ChirashiImageModal from '../../components/ChirashiImageModal';
 import { Store } from '../../types';
+
+const NEARBY_RADIUS = Number(process.env.EXPO_PUBLIC_NEARBY_STORES_RADIUS_METERS ?? 5000);
+
+const CATEGORY_COLOR: Record<string, string> = {
+  supermarket: '#4DB547',
+  grocery_store: '#4DB547',
+  convenience_store: '#FF9800',
+  drugstore: '#29B6F6',
+  pharmacy: '#29B6F6',
+  department_store: '#AB47BC',
+  clothing_store: '#AB47BC',
+  shoe_store: '#AB47BC',
+  restaurant: '#F44336',
+  cafe: '#795548',
+  bakery: '#795548',
+  electronics_store: '#78909C',
+  home_goods_store: '#607D8B',
+  furniture_store: '#607D8B',
+  hardware_store: '#607D8B',
+  book_store: '#FF7043',
+  pet_store: '#FF7043',
+  liquor_store: '#FF7043',
+  florist: '#EC407A',
+  jewelry_store: '#EC407A',
+};
 
 type ViewMode = 'map' | 'list';
 
 export default function HomeScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [mealStore, setMealStore] = useState<Store | null>(null);
+  const [chirashiModalVisible, setChirashiModalVisible] = useState(false);
   const { stores, location, loading, error, refresh } = useStores();
 
   if (error) {
     return (
       <View style={styles.centered}>
-        <Ionicons name="location-off" size={48} color="#FF6B35" />
+        <Ionicons name="location-outline" size={48} color="#FF6B35" />
         <Text style={styles.errorTitle}>位置情報を取得できません</Text>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={refresh}>
@@ -80,13 +109,13 @@ export default function HomeScreen() {
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>
-            {stores.reduce((acc, s) => acc + s.flyerCount, 0)}
+            {stores.reduce((acc, s) => acc + s.dealCount, 0)}
           </Text>
           <Text style={styles.statLabel}>お得情報</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>500m</Text>
+          <Text style={styles.statNumber}>{NEARBY_RADIUS >= 1000 ? `${NEARBY_RADIUS / 1000}km` : `${NEARBY_RADIUS}m`}</Text>
           <Text style={styles.statLabel}>範囲</Text>
         </View>
       </View>
@@ -113,33 +142,41 @@ export default function HomeScreen() {
             >
               <Circle
                 center={location}
-                radius={500}
+                radius={NEARBY_RADIUS}
                 fillColor="rgba(255, 107, 53, 0.08)"
                 strokeColor="rgba(255, 107, 53, 0.3)"
                 strokeWidth={1}
               />
-              {stores.map((store) => (
-                <Marker
-                  key={store.id}
-                  coordinate={{
-                    latitude: store.latitude,
-                    longitude: store.longitude,
-                  }}
-                  onPress={() => setSelectedStore(store)}
-                >
-                  <View style={[
-                    styles.markerContainer,
-                    selectedStore?.id === store.id && styles.markerSelected
-                  ]}>
-                    <Text style={styles.markerEmoji}>{store.categoryEmoji}</Text>
-                    {store.flyerCount > 0 && (
-                      <View style={styles.markerBadge}>
-                        <Text style={styles.markerBadgeText}>{store.flyerCount}</Text>
+              {stores.map((store) => {
+                const color = CATEGORY_COLOR[store.category] ?? '#F44336';
+                const isSelected = selectedStore?.id === store.id;
+                return (
+                  <Marker
+                    key={store.id}
+                    coordinate={{ latitude: store.latitude, longitude: store.longitude }}
+                    onPress={() => setSelectedStore(store)}
+                    tracksViewChanges={false}
+                  >
+                    <View style={styles.pinWrapper}>
+                      <View style={[
+                        styles.pinHead,
+                        { backgroundColor: color },
+                        isSelected && styles.pinHeadSelected,
+                      ]}>
+                        <Text style={styles.pinEmoji}>{store.categoryEmoji}</Text>
+                        {store.dealCount > 0 && (
+                          <View style={[styles.markerBadge, { backgroundColor: isSelected ? '#FFF' : '#FF3B30' }]}>
+                            <Text style={[styles.markerBadgeText, { color: isSelected ? color : '#FFF' }]}>
+                              {store.dealCount}
+                            </Text>
+                          </View>
+                        )}
                       </View>
-                    )}
-                  </View>
-                </Marker>
-              ))}
+                      <View style={[styles.pinTail, { borderTopColor: color }]} />
+                    </View>
+                  </Marker>
+                );
+              })}
             </MapView>
           )}
 
@@ -151,7 +188,23 @@ export default function HomeScreen() {
                 onClose={() => setSelectedStore(null)}
                 expanded
               />
+              {selectedStore.deals.length > 0 && (
+                <TouchableOpacity
+                  style={styles.mapMealButton}
+                  onPress={() => setMealStore(selectedStore)}
+                >
+                  <Text style={styles.mapMealButtonText}>🍽️ 献立を提案する</Text>
+                </TouchableOpacity>
+              )}
             </View>
+          )}
+
+          {mealStore && (
+            <MealSuggestionModal
+              store={mealStore}
+              visible={!!mealStore}
+              onClose={() => setMealStore(null)}
+            />
           )}
         </View>
       ) : (
@@ -177,6 +230,20 @@ export default function HomeScreen() {
           }
         />
       )}
+
+      {/* チラシ画像から献立提案 FAB */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setChirashiModalVisible(true)}
+      >
+        <Ionicons name="newspaper-outline" size={22} color="#FFF" />
+        <Text style={styles.fabText}>チラシ</Text>
+      </TouchableOpacity>
+
+      <ChirashiImageModal
+        visible={chirashiModalVisible}
+        onClose={() => setChirashiModalVisible(false)}
+      />
     </View>
   );
 }
@@ -197,14 +264,14 @@ const styles = StyleSheet.create({
   },
   headerLabel: {
     fontSize: 11,
-    fontFamily: 'NotoSansJP-Regular',
+    fontWeight: 'normal',
     color: '#999',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   headerTitle: {
     fontSize: 26,
-    fontFamily: 'NotoSansJP-Bold',
+    fontWeight: 'bold',
     color: '#1A1A1A',
     letterSpacing: -0.5,
   },
@@ -243,12 +310,12 @@ const styles = StyleSheet.create({
   },
   statNumber: {
     fontSize: 22,
-    fontFamily: 'NotoSansJP-Bold',
+    fontWeight: 'bold',
     color: '#FF6B35',
   },
   statLabel: {
     fontSize: 11,
-    fontFamily: 'NotoSansJP-Regular',
+    fontWeight: 'normal',
     color: '#999',
     marginTop: 2,
   },
@@ -264,29 +331,43 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  markerContainer: {
-    backgroundColor: '#FFF',
-    borderRadius: 24,
-    padding: 8,
+  pinWrapper: {
+    alignItems: 'center',
+  },
+  pinHead: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-    position: 'relative',
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
   },
-  markerSelected: {
-    backgroundColor: '#FF6B35',
-    transform: [{ scale: 1.15 }],
+  pinHeadSelected: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
-  markerEmoji: {
-    fontSize: 22,
+  pinTail: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -1,
+  },
+  pinEmoji: {
+    fontSize: 18,
   },
   markerBadge: {
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: '#FF3B30',
     borderRadius: 10,
     minWidth: 18,
     height: 18,
@@ -295,9 +376,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   markerBadgeText: {
-    color: '#FFF',
     fontSize: 10,
-    fontFamily: 'NotoSansJP-Bold',
+    fontWeight: 'bold',
+  },
+  mapMealButton: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    backgroundColor: '#FF6B35',
+    borderRadius: 24,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  mapMealButtonText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
   bottomSheet: {
     position: 'absolute',
@@ -327,18 +420,18 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    fontFamily: 'NotoSansJP-Regular',
+    fontWeight: 'normal',
     color: '#999',
     marginTop: 8,
   },
   errorTitle: {
     fontSize: 18,
-    fontFamily: 'NotoSansJP-Bold',
+    fontWeight: 'bold',
     color: '#1A1A1A',
   },
   errorText: {
     fontSize: 13,
-    fontFamily: 'NotoSansJP-Regular',
+    fontWeight: 'normal',
     color: '#999',
     textAlign: 'center',
   },
@@ -351,7 +444,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     color: '#FFF',
-    fontFamily: 'NotoSansJP-Bold',
+    fontWeight: 'bold',
     fontSize: 14,
   },
   emptyContainer: {
@@ -364,8 +457,30 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    fontFamily: 'NotoSansJP-Regular',
+    fontWeight: 'normal',
     color: '#999',
     textAlign: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 32,
+    right: 20,
+    backgroundColor: '#FF6B35',
+    borderRadius: 28,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  fabText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 13,
   },
 });
