@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
+  Animated,
   RefreshControl,
   StatusBar,
   Platform,
@@ -46,6 +46,35 @@ const CATEGORY_COLOR: Record<string, string> = {
 
 type ViewMode = 'map' | 'list';
 
+function StoreLoadingScreen() {
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: 100,
+      duration: 3000,
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
+  const widthInterpolate = progressAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+  });
+
+  return (
+    <View style={styles.loadingContainer}>
+      <Text style={styles.loadingEmoji}>🗺️</Text>
+      <Text style={styles.loadingTitle}>周辺のお買い得を探しています</Text>
+      <View style={styles.progressBarContainer}>
+        <Animated.View style={[styles.progressFill, { width: widthInterpolate as any }]} />
+      </View>
+      <Text style={styles.loadingHint}>5km圏内の店舗を確認中…</Text>
+      <Text style={styles.loadingSubhint}>GPS・チラシ情報を取得しています</Text>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
@@ -66,6 +95,15 @@ export default function HomeScreen() {
     );
   }
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FAFAF7" />
+        <StoreLoadingScreen />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FAFAF7" />
@@ -76,28 +114,17 @@ export default function HomeScreen() {
           <Text style={styles.headerLabel}>現在地周辺</Text>
           <Text style={styles.headerTitle}>お買い得情報</Text>
         </View>
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, viewMode === 'map' && styles.toggleActive]}
-            onPress={() => setViewMode('map')}
-          >
-            <Ionicons
-              name="map"
-              size={18}
-              color={viewMode === 'map' ? '#FAFAF7' : '#2D2D2D'}
-            />
+        {viewMode === 'map' ? (
+          <TouchableOpacity style={styles.listBtn} onPress={() => setViewMode('list')}>
+            <Ionicons name="menu" size={16} color="#FFF" />
+            <Text style={styles.listBtnLabel}>リスト</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, viewMode === 'list' && styles.toggleActive]}
-            onPress={() => setViewMode('list')}
-          >
-            <Ionicons
-              name="list"
-              size={18}
-              color={viewMode === 'list' ? '#FAFAF7' : '#2D2D2D'}
-            />
+        ) : (
+          <TouchableOpacity style={styles.mapBtn} onPress={() => setViewMode('map')}>
+            <Ionicons name="map" size={16} color="#FFF" />
+            <Text style={styles.listBtnLabel}>地図</Text>
           </TouchableOpacity>
-        </View>
+        )}
       </View>
 
       {/* Stats Bar */}
@@ -121,12 +148,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Content */}
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#FF6B35" />
-          <Text style={styles.loadingText}>周辺店舗を検索中...</Text>
-        </View>
-      ) : viewMode === 'map' ? (
+      {viewMode === 'map' ? (
         <View style={styles.mapContainer}>
           {location && (
             <MapView
@@ -275,19 +297,28 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
     letterSpacing: -0.5,
   },
-  toggleContainer: {
+  listBtn: {
     flexDirection: 'row',
-    backgroundColor: '#EBEBEB',
-    borderRadius: 10,
-    padding: 3,
-    gap: 2,
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FF6B35',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
-  toggleBtn: {
-    padding: 8,
-    borderRadius: 8,
-  },
-  toggleActive: {
+  mapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#2D2D2D',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  listBtnLabel: {
+    fontSize: 12,
+    fontWeight: 'bold' as const,
+    color: '#FFF',
   },
   statsBar: {
     flexDirection: 'row',
@@ -418,11 +449,42 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 40,
   },
-  loadingText: {
-    fontSize: 14,
-    fontWeight: 'normal',
-    color: '#999',
-    marginTop: 8,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    gap: 16,
+  },
+  loadingEmoji: {
+    fontSize: 56,
+    marginBottom: 8,
+  },
+  loadingTitle: {
+    fontSize: 17,
+    fontWeight: 'bold' as const,
+    color: '#333',
+    textAlign: 'center' as const,
+  },
+  progressBarContainer: {
+    width: '100%',
+    height: 6,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 99,
+    overflow: 'hidden' as const,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#FF6B35',
+    borderRadius: 99,
+  },
+  loadingHint: {
+    fontSize: 13,
+    color: '#888',
+  },
+  loadingSubhint: {
+    fontSize: 11,
+    color: '#BBB',
   },
   errorTitle: {
     fontSize: 18,
